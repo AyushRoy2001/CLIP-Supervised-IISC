@@ -7,7 +7,7 @@ from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 
 from model import CustomCLIP
-from configs import transformation, parse_option
+from configs import transformation, parse_option, RMSELoss, ContrastiveLoss
 from dataloader import IQADataloader
 
 # The arguments
@@ -18,6 +18,7 @@ k_fold = args.k_fold
 
 # Load the transforms and model
 model = CustomCLIP().to(args.device)
+model.float()
 data_transforms = transformation()
 
 # k model training
@@ -26,20 +27,19 @@ for z in range(k_fold):
     data_dir = args.image_directory
 
     # Create the train dataset and data loader
-    train_csv_path = "csvs/LIVE_C/train/train_" + str(z) + ".csv"
+    train_csv_path = args.csv_directory_train + str(z) + ".csv"
     train_dataset = IQADataloader(data_dir, csv_file=train_csv_path, transform=data_transforms['train'])
-    train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
 
     # Create the val dataset and data loader
-    val_csv_path = "csvs/LIVE_C/val/val_" + str(z) + ".csv"
+    val_csv_path = args.csv_directory_val + str(z) + ".csv"
     val_dataset = IQADataloader(data_dir, csv_file=val_csv_path, transform=data_transforms['train'])
-    val_loader = DataLoader(val_dataset, batch_size=1, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True)
 
     # Define the loss function and optimizer
-    criterion = nn.MSELoss()
-    #learnable_params = [model.text1_token, model.text2_token] # parameters to be trained
-    #learnable_params = model.clip_model.visual.parameters()
-    learnable_params = [model.dense_layer.weight, model.dense_layer.bias]
+    rmse = RMSELoss()
+    conloss = ContrastiveLoss()
+    learnable_params = model.clip_model.visual.parameters() # parameters to be trained
     optimizer = optim.Adam(learnable_params, lr=args.lr)  
     scheduler = ReduceLROnPlateau(optimizer, 'min')
 
@@ -54,6 +54,7 @@ for z in range(k_fold):
     for epoch in range(num_epochs):
         # Set the model in training mode
         model.train()
+        print('Epoch: ', epoch)
 
         # Initialize running loss
         running_loss = 0.0
@@ -67,15 +68,15 @@ for z in range(k_fold):
             optimizer.zero_grad()
         
             # Forward pass
-            outputs = model(inputs)
-            print(outputs)
-            print(labels)
-
-            loss = criterion(outputs, labels)
+            outputs, image_embeds, text_embeds_pos, text_embeds_neg = model(inputs)
+            
+            # Combining the losses
+            loss_mse = rmse(outputs, labels)
+            loss_con = conloss(image_embeds, text_embeds_pos, text_embeds_neg, labels)
+            loss = loss_mse+loss_con
 
             # Backward pass and optimization and Clip gradients to a maximum norm
             loss.backward()
-            #nn.utils.clip_grad_norm_(model.parameters(), args.gradient_clipping)
             optimizer.step()
 
             # Update running loss
@@ -83,7 +84,7 @@ for z in range(k_fold):
 
             # Visualizing various training metrics, losses, and parameters (run tensorboard --logdir=runs after training in terminal)
             writer.add_scalar('training loss', running_loss / 1000, epoch * len(train_loader))
-            # for name, param in model.named_parameters():
+            # for name, param in model.parameters():
             #     writer.add_histogram(name, param.clone().cpu().data.numpy(), global_step=epoch)
 
         # Calculate average training loss
@@ -102,8 +103,10 @@ for z in range(k_fold):
                 labels = labels.to(args.device)
 
                 # Forward pass
-                outputs = model(inputs)
-                loss = criterion(outputs.squeeze(), labels)
+                outputs, image_embeds, text_embeds_pos, text_embeds_neg = model(inputs)
+                loss_mse = rmse(outputs, labels)
+                loss_con = conloss(image_embeds, text_embeds_pos, text_embeds_neg, labels)
+                loss = loss_mse+loss_con
 
                 # Update validation loss
                 val_loss += loss.item() * inputs.size(0)
@@ -117,3 +120,8 @@ for z in range(k_fold):
         # Print epoch statistics
         print(f'Epoch {epoch+1}/{num_epochs}')
         print(f'Training Loss: {train_loss:.4f} | Validation Loss: {val_loss:.4f}')
+
+    # Save the model and constants.pkl file
+    save_path = args.model_directory + "trained_model_" + str(z) + ".pt"
+    constants_path = args.model_directory + "constants_" + str(z) + ".pkl"
+    torch.jit.save(model, save_path, _extra_files={"constants.pkl": constants_path})

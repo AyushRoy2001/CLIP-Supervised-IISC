@@ -71,13 +71,9 @@ for z in range(k_fold):
         plcc_scores.append(plcc)
         srocc_scores.append(srocc)
 
-# The median of PLCC and SROCC scores for all folds
-median_plcc = np.median(plcc_scores)
-median_srocc = np.median(srocc_scores)
+# The median scores of PLCC and SROCC scores for all folds
+print("The median PLCC for all the models:", np.median(plcc_scores))
+print("The median SROCC for all the models:", np.median(srocc_scores))
 
-# The median scores
-print("The median PLCC for all the models:")
-print(median_plcc)
-print("The median SROCC for all the models:")
-print(median_srocc)
+
 

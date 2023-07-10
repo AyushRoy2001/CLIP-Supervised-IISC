@@ -1,3 +1,4 @@
+import torch
 import os
 import scipy
 import random
@@ -89,6 +90,9 @@ class IQADataloader(Dataset):
 
         if self.transform is not None:
             image = self.transform(image)
+
+        image = torch.tensor(image, dtype=torch.float32)
+        label = torch.tensor(label, dtype=torch.float32)
 
         return image, label
 
