@@ -24,14 +24,14 @@ def transformation():
     return data_transforms
 
 # Custom loss
-class RMSELoss(nn.Module):
+class MSELoss(nn.Module):
     def __init__(self):
-        super(RMSELoss, self).__init__()
+        super(MSELoss, self).__init__()
 
     def forward(self, predicted, target):
         mse_loss = nn.MSELoss()
-        rmse_loss = torch.sqrt(mse_loss(predicted, target))
-        return rmse_loss
+        mse_loss = mse_loss(predicted, target)
+        return mse_loss
 
 class ContrastiveLoss(nn.Module):
     def __init__(self):
@@ -77,15 +77,17 @@ def parse_option():
     parser = argparse.ArgumentParser('argument for training')
 
     parser.add_argument('--k_fold', type=int,
-                        default=5, help='K Fold')  
+                        default=1, help='K Fold')  
     parser.add_argument('--epochs', type=int,
-                        default=100, help='Number of epochs per fold')
+                        default=10, help='Number of epochs per fold')
     parser.add_argument('--batch_size', type=int,
-                        default=4, help='Batch size')
+                        default=8, help='Batch size')
     parser.add_argument('--lr', type=float,
                         default=0.0000001, help='Learning rate')
     parser.add_argument('--tau', type=float,
                         default=100.0, help='Tau parameter for clip')
+    parser.add_argument('--alpha', type=float,
+                        default=0.5, help='parameter for weighted loss combination')
     parser.add_argument('--device', type=str,
                         default='cuda', help='Device (cpu/cuda)')
     parser.add_argument('--image_directory', type=str,
