@@ -4,7 +4,7 @@ import numpy as np
 from scipy import stats
 import matplotlib.pyplot as plt
 
-from configs import transformation, parse_option, RMSELoss, ContrastiveLoss
+from configs import transformation, parse_option
 from dataloader import IQADataloader
 from model import CustomCLIP
 
@@ -13,11 +13,6 @@ data_transforms = transformation()
 
 # The arguments
 args = parse_option()
-
-# K losses to be stored
-rmse = RMSELoss()
-conloss = ContrastiveLoss()
-losses = []
 
 # K PLCC and SROCC to be stored
 plcc_scores = []
@@ -30,16 +25,12 @@ for z in range(k_fold):
     data_dir = args.image_directory
     test_csv_path = args.csv_directory_test + str(z) + ".csv"
     test_dataset = IQADataloader(data_dir, csv_file=test_csv_path, transform=data_transforms['validation'])
-    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=True)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=4, shuffle=True)
 
     # Testing loop
     save_path = args.model_directory + "trained_model_" + str(z) + ".pt"
-    const_path = args.model_directory + "constants_" + str(z) + ".pkl"
-    model = torch.jit.load(save_path)
+    model = torch.load(save_path)
     model.eval()
-
-    # Initializing testing loss
-    test_loss = 0.0
 
     predictions = []  # all labels
     labels = []  # all predictions
@@ -54,12 +45,6 @@ for z in range(k_fold):
 
             # Forward pass
             outputs, image_embeds, text_embeds_pos, text_embeds_neg = model(inputs)
-            loss_mse = rmse(outputs, labels)
-            loss_con = conloss(image_embeds, text_embeds_pos, text_embeds_neg, labels)
-            loss = loss_mse+loss_con
-
-            # Update testing loss
-            test_loss += loss.item() * inputs.size(0)
 
             # Predictions and ground truth labels
             predictions.extend(outputs.squeeze().cpu().numpy())
@@ -84,17 +69,9 @@ for z in range(k_fold):
         plcc_scores.append(plcc)
         srocc_scores.append(srocc)
 
-    # Average testing loss
-    test_loss /= len(test_dataset)
-    losses.append(test_loss)
-
-    # Testing loss for this fold
-    print(f'Testing Loss for fold {z}: {test_loss:.4f}')
-
 # The median of PLCC and SROCC scores for all folds
 print("The median PLCC for all the models:", np.median(plcc_scores))
 print("The median SROCC for all the models:", np.median(srocc_scores))
-
 
 
     
