@@ -76,4 +76,3 @@ print("The median PLCC for all the models:", np.median(plcc_scores))
 print("The median SROCC for all the models:", np.median(srocc_scores))
 
 
-
