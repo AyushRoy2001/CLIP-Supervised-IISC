@@ -79,11 +79,13 @@ def parse_option():
     parser.add_argument('--k_fold', type=int,
                         default=1, help='K Fold')  
     parser.add_argument('--epochs', type=int,
-                        default=10, help='Number of epochs per fold')
+                        default=20, help='Number of epochs per fold')
+    parser.add_argument('--random_seed', type=int,
+                        default=42, help='Number of epochs per fold')
     parser.add_argument('--batch_size', type=int,
-                        default=8, help='Batch size')
+                        default=4, help='Batch size')
     parser.add_argument('--lr', type=float,
-                        default=0.0000001, help='Learning rate')
+                        default=0.000001, help='Learning rate')
     parser.add_argument('--tau', type=float,
                         default=100.0, help='Tau parameter for clip')
     parser.add_argument('--alpha', type=float,
