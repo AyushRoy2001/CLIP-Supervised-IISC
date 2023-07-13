@@ -1,4 +1,6 @@
+from random import random
 from statistics import mean
+import sys
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -6,6 +8,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 import numpy as np
+from scipy import stats
 
 from model import CustomCLIP
 from configs import transformation, parse_option, MSELoss, ContrastiveLoss
@@ -13,6 +16,10 @@ from dataloader import IQADataloader
 
 # The arguments
 args = parse_option()
+
+# Fix things up to reduce randomization
+torch.manual_seed(args.random_seed)
+np.random.seed(args.random_seed)
 
 # Create the folds for training and validation
 k_fold = args.k_fold
@@ -50,6 +57,10 @@ for z in range(k_fold):
     # Set tensorboard for visualization
     viz = 'runs/k_fold_' + str(z)
     writer = SummaryWriter(viz)
+
+    # Initialize the best validation loss, srocc
+    best_val_loss = 10000.0
+    best_val_srocc = 0.0
 
     # Training loop
     for epoch in range(num_epochs):
@@ -100,8 +111,10 @@ for z in range(k_fold):
         # Set the model in evaluation mode
         model.eval()
 
-        # Initialize validation loss
+        # Initialize validation loss, plcc and srocc
         val_loss = 0.0
+        pred = [] 
+        lab = []
 
         # Iterate over the validation data
         with torch.no_grad():
@@ -112,23 +125,37 @@ for z in range(k_fold):
                 # Forward pass
                 outputs, image_embeds, text_embeds_pos, text_embeds_neg = model(inputs)
                 loss_mse = mse(outputs, labels)
+                pred.extend(outputs.squeeze().cpu().numpy())
+                lab.extend(labels.cpu().numpy())
 
                 # Update validation loss
                 val_loss += loss_mse.item() * inputs.size(0)
 
         # Calculate average validation loss
         val_loss /= len(val_dataset)
+        plcc = np.corrcoef(pred, lab)[0, 1]
+        srocc = stats.spearmanr(pred, lab)[0]
 
         # Visualizing various training metrics, losses, and parameters (run tensorboard --logdir=runs after training in terminal)
         writer.add_scalar('mse validation loss', val_loss, epoch)
+        writer.add_scalar('srocc validation loss', srocc, epoch)
+        writer.add_scalar('srocc validation loss', plcc, epoch)
 
         # Adjust the learning rate based on validation loss
         #scheduler.step(val_loss)
-
+        
         # Print epoch statistics
         print(f'Epoch {epoch+1}/{num_epochs}')
-        print(f'Training Loss: {train_loss:.4f} | Validation Loss: {val_loss:.4f}')
+        print(f'Training Loss: {train_loss:.4f} | Validation Loss: {val_loss:.4f} | Validation SROCC: {srocc:.4f} | Validation PLCC: {plcc:.4f}')
 
-    # Save the model and constants.pkl file
-    save_path = args.model_directory + "trained_model_" + str(z) + ".pt"
-    torch.save(model, save_path)
+        # Save the best model file
+        save_path_loss = args.model_directory + "trained_model_loss_" + str(z) + ".pt"
+        save_path_srocc = args.model_directory + "trained_model_srocc_" + str(z) + ".pt"
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            print("model loss performance improved, saving the model")
+            torch.save(model, save_path_loss)
+        if srocc > best_val_srocc:
+            best_val_srocc = srocc
+            print("model srocc performance improved, saving the model")
+            torch.save(model, save_path_srocc)
