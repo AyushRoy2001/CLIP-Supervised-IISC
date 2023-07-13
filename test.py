@@ -3,6 +3,7 @@ import torch.nn as nn
 import numpy as np
 from scipy import stats
 import matplotlib.pyplot as plt
+from random import random
 
 from configs import transformation, parse_option
 from dataloader import IQADataloader
@@ -13,6 +14,10 @@ data_transforms = transformation()
 
 # The arguments
 args = parse_option()
+
+# Fix things up to reduce randomization
+torch.manual_seed(args.random_seed)
+np.random.seed(args.random_seed)
 
 # K PLCC and SROCC to be stored
 plcc_scores = []
@@ -25,10 +30,10 @@ for z in range(k_fold):
     data_dir = args.image_directory
     test_csv_path = args.csv_directory_test + str(z) + ".csv"
     test_dataset = IQADataloader(data_dir, csv_file=test_csv_path, transform=data_transforms['validation'])
-    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=4, shuffle=True)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=args.batch_size, shuffle=True)
 
     # Testing loop
-    save_path = args.model_directory + "trained_model_" + str(z) + ".pt"
+    save_path = args.model_directory + "trained_model_srocc_" + str(z) + ".pt"
     model = torch.load(save_path)
     model.eval()
 
