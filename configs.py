@@ -81,7 +81,7 @@ def parse_option():
     parser.add_argument('--epochs', type=int,
                         default=20, help='Number of epochs per fold')
     parser.add_argument('--random_seed', type=int,
-                        default=42, help='Number of epochs per fold')
+                        default=42, help='To reduce randomized results')
     parser.add_argument('--batch_size', type=int,
                         default=4, help='Batch size')
     parser.add_argument('--lr', type=float,
