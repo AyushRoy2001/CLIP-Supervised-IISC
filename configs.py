@@ -79,7 +79,7 @@ def parse_option():
     parser.add_argument('--k_fold', type=int,
                         default=1, help='K Fold')  
     parser.add_argument('--epochs', type=int,
-                        default=20, help='Number of epochs per fold')
+                        default=25, help='Number of epochs per fold')
     parser.add_argument('--random_seed', type=int,
                         default=42, help='To reduce randomized results')
     parser.add_argument('--batch_size', type=int,
@@ -90,6 +90,8 @@ def parse_option():
                         default=100.0, help='Tau parameter for clip')
     parser.add_argument('--alpha', type=float,
                         default=0.5, help='parameter for weighted loss combination')
+    parser.add_argument('--scaling', type=float,
+                        default=1.0, help='parameter for scaling mse loss')
     parser.add_argument('--device', type=str,
                         default='cuda', help='Device (cpu/cuda)')
     parser.add_argument('--image_directory', type=str,
