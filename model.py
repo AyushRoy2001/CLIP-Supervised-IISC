@@ -26,7 +26,14 @@ class CustomCLIP(nn.Module):
         # The two prompts
         text1 = "Good photo."
         text2 = "Bad photo."
-        text3 = "Worst photo."
+        text3 = "Beautiful photo."
+        text4 = "Ugly photo."
+        text5 = "Bright photo."
+        text6 = "Dim photo."
+        text7 = "poor"
+        text8 = "fair"
+        text9 = "perfect"
+        text10 = "horrible"
 
         # Encode images
         image_embed = self.clip_model.encode_image(images.to(args.device))
@@ -35,17 +42,34 @@ class CustomCLIP(nn.Module):
         text1_token = clip.tokenize(text1).to(args.device)
         text2_token = clip.tokenize(text2).to(args.device)
         text3_token = clip.tokenize(text3).to(args.device)
+        text4_token = clip.tokenize(text4).to(args.device)
+        text5_token = clip.tokenize(text5).to(args.device)
+        text6_token = clip.tokenize(text6).to(args.device)
+        text7_token = clip.tokenize(text7).to(args.device)
+        text8_token = clip.tokenize(text8).to(args.device)
+        text9_token = clip.tokenize(text9).to(args.device)
+        text10_token = clip.tokenize(text10).to(args.device)
         text1_embed = self.clip_model.encode_text(text1_token)
         text2_embed = self.clip_model.encode_text(text2_token)
         text3_embed = self.clip_model.encode_text(text3_token)
+        text4_embed = self.clip_model.encode_text(text4_token)
+        text5_embed = self.clip_model.encode_text(text5_token)
+        text6_embed = self.clip_model.encode_text(text6_token)
+        text7_embed = self.clip_model.encode_text(text7_token)
+        text8_embed = self.clip_model.encode_text(text8_token)
+        text9_embed = self.clip_model.encode_text(text9_token)
+        text10_embed = self.clip_model.encode_text(text10_token)
 
-        ortho_vect = self._ortho.getOrtho(torch.stack([text1_embed[0], text2_embed[0], text3_embed[0]]))
-        image_embed_projection = torch.matmul(torch.matmul(image_embed,ortho_vect.T), ortho_vect)   # dimension: batch_size by embedding shape (1024)
+        ortho_vect = self._ortho.getOrtho(torch.stack([text1_embed[0], text2_embed[0], text3_embed[0], text4_embed[0], text5_embed[0], text6_embed[0], text7_embed[0], text8_embed[0], text9_embed[0], text10_embed[0]]))
+        image_embed_projection = torch.matmul(image_embed, ortho_vect.T)   # dimension: batch_size by vector space size (number of text prompts)
+        t1_projection = torch.matmul(text1_embed, ortho_vect.T)
+        t2_projection = torch.matmul(text2_embed, ortho_vect.T)
+        #t3_projection = torch.matmul(text3_embed, ortho_vect.T)
 
         # Calculate cosine similarities
-        s1 = self.cosine_similarity(image_embed_projection, text1_embed)
-        s2 = self.cosine_similarity(image_embed_projection, text2_embed)
-        #s3 = self.cosine_similarity(image_embed_projection, text3_embed)
+        s1 = self.cosine_similarity(image_embed_projection, t1_projection)
+        s2 = self.cosine_similarity(image_embed_projection, t2_projection)
+        #s3 = self.cosine_similarity(image_embed_projection, t3_projection)
 
         s1_scaled = torch.tensor(args.tau, device=args.device) * s1
         s2_scaled = torch.tensor(args.tau, device=args.device) * s2
@@ -55,7 +79,7 @@ class CustomCLIP(nn.Module):
         softmax_sim = nn.Softmax(dim=1)(torch.stack([s1_scaled, s2_scaled], dim=1))
         mos = (softmax_sim[:, 0] * 100).to(torch.float32)
 
-        return mos, image_embed_projection, text1_embed, text2_embed
+        return mos, image_embed_projection, t1_projection, t2_projection
 
 # CLIP IQA model
 class CLIP_IQA(nn.Module):
