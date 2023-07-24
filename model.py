@@ -1,11 +1,14 @@
 import torch
 import torch.optim as optim
+import torch
+import torch.optim as optim
 import torch.nn as nn
 import clip
 import numpy as np
 
 from configs import parse_option
 from pae import Ortho
+from distributions import Distribution
 
 # The arguments
 args = parse_option()
@@ -17,6 +20,7 @@ class CustomCLIP(nn.Module):
         self.clip_model, self.preprocess = clip.load("RN50", device=args.device)
         self.cosine_similarity = nn.CosineSimilarity(dim=-1)
         self._ortho = Ortho()
+        self.text_distribution = Distribution()
 
         for param in self.parameters():
             param.requires_grad = True
@@ -62,24 +66,26 @@ class CustomCLIP(nn.Module):
 
         ortho_vect = self._ortho.getOrtho(torch.stack([text1_embed[0], text2_embed[0], text3_embed[0], text4_embed[0], text5_embed[0], text6_embed[0], text7_embed[0], text8_embed[0], text9_embed[0], text10_embed[0]]))
         image_embed_projection = torch.matmul(image_embed, ortho_vect.T)   # dimension: batch_size by vector space size (number of text prompts)
-        t1_projection = torch.matmul(text1_embed, ortho_vect.T)
-        t2_projection = torch.matmul(text2_embed, ortho_vect.T)
-        #t3_projection = torch.matmul(text3_embed, ortho_vect.T)
+        image_embed_projection = image_embed_projection.unsqueeze(1)  # Make it broadcastable by adding a new dimension (batch_size x 1 x 10)
+        text_embed_projection_good = torch.matmul(torch.cat((text1_embed,text3_embed,text5_embed,text7_embed,text9_embed)), ortho_vect.T) # projected good text embeddings
+        text_embed_projection_bad = torch.matmul(torch.cat((text2_embed,text4_embed,text6_embed,text8_embed,text10_embed)), ortho_vect.T) # projected bad text embeddings
+
+        tg = self.text_distribution.generateSamples(good=True) # random samples of the good subspace
+        tb = self.text_distribution.generateSamples(good=False) # random samples of the bad subspace
 
         # Calculate cosine similarities
-        s1 = self.cosine_similarity(image_embed_projection, t1_projection)
-        s2 = self.cosine_similarity(image_embed_projection, t2_projection)
-        #s3 = self.cosine_similarity(image_embed_projection, t3_projection)
+        s1 = self.cosine_similarity(image_embed_projection, tg)
+        s2 = self.cosine_similarity(image_embed_projection, tb)
 
         s1_scaled = torch.tensor(args.tau, device=args.device) * s1
         s2_scaled = torch.tensor(args.tau, device=args.device) * s2
-        #s3_scaled = torch.tensor(args.tau, device=args.device) * s3
    
         # Apply softmax function
         softmax_sim = nn.Softmax(dim=1)(torch.stack([s1_scaled, s2_scaled], dim=1))
         mos = (softmax_sim[:, 0] * 100).to(torch.float32)
-
-        return mos, image_embed_projection, t1_projection, t2_projection
+        mos = torch.mean(mos, dim=1)
+        
+        return mos, image_embed_projection, tg, tb
 
 # CLIP IQA model
 class CLIP_IQA(nn.Module):
