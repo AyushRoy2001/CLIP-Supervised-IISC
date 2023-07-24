@@ -24,13 +24,12 @@ np.random.seed(args.random_seed)
 # Create the folds for training and validation
 k_fold = args.k_fold
 
-# Load the transforms and model
-model = CustomCLIP().to(args.device)
-model.float()
-data_transforms = transformation()
-
 # k model training
 for z in range(k_fold):
+    # Load the transforms and model
+    model = CustomCLIP().to(args.device)
+    model.float()
+    data_transforms = transformation()
 
     data_dir = args.image_directory
 
@@ -47,8 +46,13 @@ for z in range(k_fold):
     # Define the loss function and optimizer
     mse = MSELoss()
     conloss = ContrastiveLoss()
-    learnable_params = model.clip_model.visual.parameters() # parameters to be trained
-    optimizer = optim.Adam(learnable_params, lr=args.lr)  
+    learnable_params = [ # the learnable parameters to sbe trained
+    {'params': model.clip_model.visual.parameters()},
+    {'params':[model.text_distribution._mu_g, model.text_distribution._A_g, model.text_distribution._mu_b, model.text_distribution._A_b]}
+    ]
+    optimizer = optim.Adam(learnable_params, lr=args.lr)
+
+  
     #scheduler = ReduceLROnPlateau(optimizer, 'min')
 
     # Set the number of epochs
@@ -86,7 +90,7 @@ for z in range(k_fold):
             # Combining the losses
             loss_mse = mse(outputs, labels)
             loss_con = conloss(image_embeds, text_embeds_pos, text_embeds_neg, labels)
-            loss = args.alpha*loss_mse+(1-args.alpha)*loss_con
+            loss = args.alpha*loss_mse+(1-args.alpha)*loss_con*args.scaling
 
             # Backward pass and optimization and Clip gradients to a maximum norm
             loss.backward()
@@ -124,7 +128,8 @@ for z in range(k_fold):
 
                 # Forward pass
                 outputs, image_embeds, text_embeds_pos, text_embeds_neg = model(inputs)
-                loss_mse = mse(outputs, labels)
+                print(outputs)
+                loss_mse = args.scaling*mse(outputs, labels)
                 pred.extend(outputs.squeeze().cpu().numpy())
                 lab.extend(labels.cpu().numpy())
 
