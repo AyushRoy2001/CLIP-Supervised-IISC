@@ -6,26 +6,26 @@ from scipy import stats
 import matplotlib.pyplot as plt
 from os.path import dirname, join as pjoin
 
-from configs import transformation, parse_option
-from dataloader import IQADataloader
-from model import CustomCLIP
+from configs import parse_option
 
 # The arguments
 args = parse_option()
 
 class Distribution:
-    def __init__(self, N):
+    def __init__(self):
         # initialising from random uniform distributions
-        self._mu_g = torch.rand(size = (1, 1024), device=args.device, requires_grad=True)
-        self._A_g = torch.rand(size = (1024, 1024), device=args.device, requires_grad=True)
-        self._mu_b = torch.rand(size = (1, 1024), device=args.device, requires_grad=True)
-        self._A_b = torch.rand(size = (1024, 1024), device=args.device, requires_grad=True)
-        self._num_samples = N
+        self._mu_g = nn.Parameter(torch.rand(size = (1, args.random_samples), device=args.device, requires_grad=True))
+        self._A_g = nn.Parameter(torch.rand(size = (args.random_samples, args.random_samples), device=args.device, requires_grad=True))
+        self._mu_b = nn.Parameter(torch.rand(size = (1, args.random_samples), device=args.device, requires_grad=True))
+        self._A_b = nn.Parameter(torch.rand(size = (args.random_samples, args.random_samples), device=args.device, requires_grad=True))
     
-    def generateSamples(self, good=True):
-        z = torch.randn(self._num_samples, device=args.device, requires_grad=True)
+    def generateSamples(self, projected_tg, projected_tb, good=True): 
+        self._mu_g = 
+        self._mu_b = 
+        z = torch.randn(args.random_samples, args.random_samples, device=args.device, requires_grad=True)
         if good:
             t_g = self._mu_g + torch.matmul(self._A_g, z)
             return t_g
-        t_b = self._mu_b + torch.matmul(self._A_b, z)
-        return t_b
+        else:
+            t_b = self._mu_b + torch.matmul(self._A_b, z)
+            return t_b
