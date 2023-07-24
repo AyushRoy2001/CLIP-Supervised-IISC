@@ -23,54 +23,6 @@ def transformation():
     }
     return data_transforms
 
-# Custom loss
-class MSELoss(nn.Module):
-    def __init__(self):
-        super(MSELoss, self).__init__()
-
-    def forward(self, predicted, target):
-        mse_loss = nn.MSELoss()
-        mse_loss = mse_loss(predicted, target)
-        return mse_loss
-
-class ContrastiveLoss(nn.Module):
-    def __init__(self):
-        super(ContrastiveLoss, self).__init__()
-
-    def forward(self, output1, output2, output3, ranking):
-        # Sorting indices for output1
-        sorted_indices = torch.argsort(ranking, descending=True)
-
-        # Sort output1 based on sorted_indices (best mos feature is the last feature)
-        output1 = torch.index_select(output1, 0, sorted_indices)
-
-        # Initialize list to store losses for different positive sample sizes
-        losses = []
-
-        # Iterate over positive sample sizes
-        for positive_size in range(1, ranking.shape[0]):
-            # Select positive and negative samples
-            positive_samples = output1[-positive_size:]
-            negative_samples = output1[:-positive_size]
-
-            # Calculate similarity scores
-            similarity_pos_1 = torch.cosine_similarity(positive_samples, output2)
-            similarity_neg_1 = torch.cosine_similarity(negative_samples, output2)
-            similarity_neg_2 = torch.cosine_similarity(positive_samples, output3)
-            similarity_pos_2 = torch.cosine_similarity(negative_samples, output3)
-
-            # Calculate contrastive loss
-            loss_1 = -torch.log(torch.exp(similarity_pos_1).sum() / (torch.exp(similarity_pos_1).sum() + torch.exp(similarity_neg_1).sum()))
-            loss_2 = -torch.log(torch.exp(similarity_pos_2).sum() / (torch.exp(similarity_pos_2).sum() + torch.exp(similarity_neg_2).sum()))
-
-            losses.append(loss_1)
-            losses.append(loss_2)
-
-        # Combine losses from different positive sample sizes
-        combined_loss = sum(losses)
-
-        return combined_loss
-
 # Arguments
 def parse_option():
 
@@ -79,19 +31,23 @@ def parse_option():
     parser.add_argument('--k_fold', type=int,
                         default=1, help='K Fold')  
     parser.add_argument('--epochs', type=int,
-                        default=25, help='Number of epochs per fold')
+                        default=250, help='Number of epochs per fold')
     parser.add_argument('--random_seed', type=int,
                         default=42, help='To reduce randomized results')
     parser.add_argument('--batch_size', type=int,
                         default=4, help='Batch size')
     parser.add_argument('--lr', type=float,
-                        default=0.000001, help='Learning rate')
+                        default=0.001, help='Learning rate')
     parser.add_argument('--tau', type=float,
-                        default=100.0, help='Tau parameter for clip')
+                        default=100.0, help='Tau parameter for cosine similarity')
+    parser.add_argument('--loss_tau', type=float,
+                        default=100.0, help='Tau parameter for contrastive loss')
     parser.add_argument('--alpha', type=float,
                         default=0.5, help='parameter for weighted loss combination')
     parser.add_argument('--scaling', type=float,
-                        default=1.0, help='parameter for scaling mse loss')
+                        default=0.1, help='parameter for scaling mse loss')
+    parser.add_argument('--random_samples', type=int,
+                        default=10, help='generating random number of samples from the subspace')
     parser.add_argument('--device', type=str,
                         default='cuda', help='Device (cpu/cuda)')
     parser.add_argument('--image_directory', type=str,
@@ -108,3 +64,54 @@ def parse_option():
     optn = parser.parse_args()
 
     return optn
+
+# Custom loss
+args = parse_option()
+class MSELoss(nn.Module):
+    def __init__(self):
+        super(MSELoss, self).__init__()
+
+    def forward(self, predicted, target):
+        mse_loss = nn.MSELoss()
+        mse_loss = mse_loss(predicted, target)
+        return mse_loss
+
+class ContrastiveLoss(nn.Module):
+    def __init__(self):
+        super(ContrastiveLoss, self).__init__()
+
+    def forward(self, output1, output2, output3, ranking):
+        output1 = output1.squeeze(1)
+        # Sorting indices for output1
+        sorted_indices = torch.argsort(ranking, descending=True)
+
+        # Sort output1 based on sorted_indices (best mos feature is the last feature)
+        output1 = torch.index_select(output1, 0, sorted_indices)
+
+        # Initialize list to store losses for different positive sample sizes
+        losses = []
+
+        # Iterate over positive sample sizes
+        for positive_size in range(1, ranking.shape[0]):
+            # Select positive and negative samples
+            negative_samples = output1[-positive_size:] #lower mos
+            positive_samples = output1[:-positive_size] #higher mos
+            negative_samples = negative_samples.unsqueeze(1)
+            positive_samples = positive_samples.unsqueeze(1)
+
+            # Calculate similarity scores
+            similarity_pos_1 = torch.cosine_similarity(positive_samples[-1].unsqueeze(1), output2)*torch.tensor(args.loss_tau, device=args.device)
+            similarity_neg_1 = torch.cosine_similarity(negative_samples, output2)*torch.tensor(args.loss_tau, device=args.device)
+            similarity_neg_2 = torch.cosine_similarity(positive_samples, output3)*torch.tensor(args.loss_tau, device=args.device)
+            similarity_pos_2 = torch.cosine_similarity(negative_samples[0].unsqueeze(1), output3)*torch.tensor(args.loss_tau, device=args.device)
+    
+            # Calculate contrastive loss
+            loss_1 = -torch.logsumexp(similarity_pos_1, dim=-1) + torch.logsumexp(torch.cat([similarity_pos_1, similarity_neg_1]),dim=0)
+            loss_2 = -torch.logsumexp(similarity_pos_2, dim=-1) + torch.logsumexp(torch.cat([similarity_pos_2, similarity_neg_2]),dim=0)
+            losses.append(sum(loss_1))
+            losses.append(sum(loss_2))
+
+        # Combine losses from different positive sample sizes
+        combined_loss = sum(losses)
+
+        return combined_loss
