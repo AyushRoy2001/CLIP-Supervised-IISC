@@ -20,55 +20,58 @@ class CustomCLIP(nn.Module):
         self.clip_model, self.preprocess = clip.load("RN50", device=args.device)
         self.cosine_similarity = nn.CosineSimilarity(dim=-1)
         self._ortho = Ortho()
-        self.text_distribution = Distribution()
+
+        # The text prompts
+        self.text1 = "Good photo."
+        self.text2 = "Bad photo."
+        self.text3 = "Beautiful photo."
+        self.text4 = "Ugly photo."
+        self.text5 = "Bright photo."
+        self.text6 = "Dim photo."
+        self.text7 = "poor"
+        self.text8 = "fair"
+        self.text9 = "perfect"
+        self.text10 = "horrible"
+
+        # Encode text
+        self.text1_token = clip.tokenize(self.text1).to(args.device)
+        self.text2_token = clip.tokenize(self.text2).to(args.device)
+        self.text3_token = clip.tokenize(self.text3).to(args.device)
+        self.text4_token = clip.tokenize(self.text4).to(args.device)
+        self.text5_token = clip.tokenize(self.text5).to(args.device)
+        self.text6_token = clip.tokenize(self.text6).to(args.device)
+        self.text7_token = clip.tokenize(self.text7).to(args.device)
+        self.text8_token = clip.tokenize(self.text8).to(args.device)
+        self.text9_token = clip.tokenize(self.text9).to(args.device)
+        self.text10_token = clip.tokenize(self.text10).to(args.device)
+        self.text1_embed = self.clip_model.encode_text(self.text1_token)
+        self.text2_embed = self.clip_model.encode_text(self.text2_token)
+        self.text3_embed = self.clip_model.encode_text(self.text3_token)
+        self.text4_embed = self.clip_model.encode_text(self.text4_token)
+        self.text5_embed = self.clip_model.encode_text(self.text5_token)
+        self.text6_embed = self.clip_model.encode_text(self.text6_token)
+        self.text7_embed = self.clip_model.encode_text(self.text7_token)
+        self.text8_embed = self.clip_model.encode_text(self.text8_token)
+        self.text9_embed = self.clip_model.encode_text(self.text9_token)
+        self.text10_embed = self.clip_model.encode_text(self.text10_token)
+
+        self.ortho_vect = self._ortho.getOrtho(torch.stack([self.text1_embed[0], self.text2_embed[0], self.text3_embed[0], self.text4_embed[0], self.text5_embed[0], self.text6_embed[0], self.text7_embed[0], self.text8_embed[0], self.text9_embed[0], self.text10_embed[0]]))
+
+        self.text_embed_projection_good = torch.matmul(torch.cat((self.text1_embed,self.text3_embed,self.text5_embed,self.text7_embed,self.text9_embed)).to(torch.float32), self.ortho_vect.T) # projected good text embeddings
+        self.text_embed_projection_bad = torch.matmul(torch.cat((self.text2_embed,self.text4_embed,self.text6_embed,self.text8_embed,self.text10_embed)).to(torch.float32), self.ortho_vect.T) # projected bad text embeddings
+
+        self.text_distribution = Distribution(self.text_embed_projection_good, self.text_embed_projection_bad)
 
         for param in self.parameters():
             param.requires_grad = True
 
     def forward(self, images):
-        torch.autograd.set_detect_anomaly(True)
-        # The two prompts
-        text1 = "Good photo."
-        text2 = "Bad photo."
-        text3 = "Beautiful photo."
-        text4 = "Ugly photo."
-        text5 = "Bright photo."
-        text6 = "Dim photo."
-        text7 = "poor"
-        text8 = "fair"
-        text9 = "perfect"
-        text10 = "horrible"
 
         # Encode images
         image_embed = self.clip_model.encode_image(images.to(args.device))
 
-        # Encode text
-        text1_token = clip.tokenize(text1).to(args.device)
-        text2_token = clip.tokenize(text2).to(args.device)
-        text3_token = clip.tokenize(text3).to(args.device)
-        text4_token = clip.tokenize(text4).to(args.device)
-        text5_token = clip.tokenize(text5).to(args.device)
-        text6_token = clip.tokenize(text6).to(args.device)
-        text7_token = clip.tokenize(text7).to(args.device)
-        text8_token = clip.tokenize(text8).to(args.device)
-        text9_token = clip.tokenize(text9).to(args.device)
-        text10_token = clip.tokenize(text10).to(args.device)
-        text1_embed = self.clip_model.encode_text(text1_token)
-        text2_embed = self.clip_model.encode_text(text2_token)
-        text3_embed = self.clip_model.encode_text(text3_token)
-        text4_embed = self.clip_model.encode_text(text4_token)
-        text5_embed = self.clip_model.encode_text(text5_token)
-        text6_embed = self.clip_model.encode_text(text6_token)
-        text7_embed = self.clip_model.encode_text(text7_token)
-        text8_embed = self.clip_model.encode_text(text8_token)
-        text9_embed = self.clip_model.encode_text(text9_token)
-        text10_embed = self.clip_model.encode_text(text10_token)
-
-        ortho_vect = self._ortho.getOrtho(torch.stack([text1_embed[0], text2_embed[0], text3_embed[0], text4_embed[0], text5_embed[0], text6_embed[0], text7_embed[0], text8_embed[0], text9_embed[0], text10_embed[0]]))
-        image_embed_projection = torch.matmul(image_embed, ortho_vect.T)   # dimension: batch_size by vector space size (number of text prompts)
+        image_embed_projection = torch.matmul(image_embed, self.ortho_vect.T)   # dimension: batch_size by vector space size (number of text prompts)
         image_embed_projection = image_embed_projection.unsqueeze(1)  # Make it broadcastable by adding a new dimension (batch_size x 1 x 10)
-        text_embed_projection_good = torch.matmul(torch.cat((text1_embed,text3_embed,text5_embed,text7_embed,text9_embed)), ortho_vect.T) # projected good text embeddings
-        text_embed_projection_bad = torch.matmul(torch.cat((text2_embed,text4_embed,text6_embed,text8_embed,text10_embed)), ortho_vect.T) # projected bad text embeddings
 
         tg = self.text_distribution.generateSamples(good=True) # random samples of the good subspace
         tb = self.text_distribution.generateSamples(good=False) # random samples of the bad subspace
