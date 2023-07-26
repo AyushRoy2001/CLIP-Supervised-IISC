@@ -90,7 +90,7 @@ for z in range(k_fold):
             # Combining the losses
             loss_mse = mse(outputs, labels)
             loss_con = conloss(image_embeds, text_embeds_pos, text_embeds_neg, labels)
-            loss = args.alpha*loss_mse+(1-args.alpha)*loss_con*args.scaling
+            loss = args.alpha*loss_mse*args.scaling+(1-args.alpha)*loss_con
 
             # Backward pass and optimization and Clip gradients to a maximum norm
             loss.backward()
@@ -128,7 +128,6 @@ for z in range(k_fold):
 
                 # Forward pass
                 outputs, image_embeds, text_embeds_pos, text_embeds_neg = model(inputs)
-                print(outputs)
                 loss_mse = args.scaling*mse(outputs, labels)
                 pred.extend(outputs.squeeze().cpu().numpy())
                 lab.extend(labels.cpu().numpy())
