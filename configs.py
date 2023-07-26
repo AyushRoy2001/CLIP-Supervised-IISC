@@ -1,3 +1,4 @@
+from statistics import mean
 import torch
 import torch.nn as nn
 from torchvision import transforms
@@ -31,13 +32,13 @@ def parse_option():
     parser.add_argument('--k_fold', type=int,
                         default=1, help='K Fold')  
     parser.add_argument('--epochs', type=int,
-                        default=250, help='Number of epochs per fold')
+                        default=25, help='Number of epochs per fold')
     parser.add_argument('--random_seed', type=int,
                         default=42, help='To reduce randomized results')
     parser.add_argument('--batch_size', type=int,
                         default=4, help='Batch size')
     parser.add_argument('--lr', type=float,
-                        default=0.001, help='Learning rate')
+                        default=0.00001, help='Learning rate')
     parser.add_argument('--tau', type=float,
                         default=100.0, help='Tau parameter for cosine similarity')
     parser.add_argument('--loss_tau', type=float,
@@ -45,7 +46,7 @@ def parse_option():
     parser.add_argument('--alpha', type=float,
                         default=0.5, help='parameter for weighted loss combination')
     parser.add_argument('--scaling', type=float,
-                        default=0.1, help='parameter for scaling mse loss')
+                        default=1.0, help='parameter for scaling mse loss')
     parser.add_argument('--random_samples', type=int,
                         default=10, help='generating random number of samples from the subspace')
     parser.add_argument('--device', type=str,
