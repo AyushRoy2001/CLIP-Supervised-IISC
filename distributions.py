@@ -12,20 +12,17 @@ from configs import parse_option
 args = parse_option()
 
 class Distribution:
-    def __init__(self):
+    def __init__(self, projected_tg, projected_tb):
         # initialising from random uniform distributions
-        self._mu_g = nn.Parameter(torch.rand(size = (1, args.random_samples), device=args.device, requires_grad=True))
-        self._A_g = nn.Parameter(torch.rand(size = (args.random_samples, args.random_samples), device=args.device, requires_grad=True))
-        self._mu_b = nn.Parameter(torch.rand(size = (1, args.random_samples), device=args.device, requires_grad=True))
-        self._A_b = nn.Parameter(torch.rand(size = (args.random_samples, args.random_samples), device=args.device, requires_grad=True))
+        self._mu_g = nn.Parameter(torch.mean(projected_tg, dim=0, keepdim=True), requires_grad=True).to(args.device)
+        self._A_g = nn.Parameter(torch.eye(args.random_samples, device=args.device), requires_grad=True)
+        self._mu_b = nn.Parameter(torch.mean(projected_tb, dim=0, keepdim=True), requires_grad=True).to(args.device)
+        self._A_b = nn.Parameter(torch.eye(args.random_samples, device=args.device), requires_grad=True)
     
-    def generateSamples(self, projected_tg, projected_tb, good=True): 
-        self._mu_g = 
-        self._mu_b = 
+    def generateSamples(self, good=True): 
         z = torch.randn(args.random_samples, args.random_samples, device=args.device, requires_grad=True)
         if good:
-            t_g = self._mu_g + torch.matmul(self._A_g, z)
-            return t_g
+            t = self._mu_g + torch.matmul(self._A_g, z)
         else:
-            t_b = self._mu_b + torch.matmul(self._A_b, z)
-            return t_b
+            t = self._mu_b + torch.matmul(self._A_b, z)
+        return t
