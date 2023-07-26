@@ -49,7 +49,7 @@ for z in range(k_fold):
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=args.batch_size, shuffle=True)
 
     # Testing loop
-    save_path = args.model_directory + "trained_model_loss_" + str(z) + ".pt"
+    save_path = args.model_directory + "trained_model_srocc_" + str(z) + ".pt"
     model = torch.load(save_path)
     model.eval()
 
@@ -168,14 +168,3 @@ for z in range(k_fold):
 # The median of PLCC and SROCC scores for all folds
 print("The median PLCC for all the models:", np.median(plcc_scores))
 print("The median SROCC for all the models:", np.median(srocc_scores))
-
-
-
-    
-
-
-    
-
-
-
-    
