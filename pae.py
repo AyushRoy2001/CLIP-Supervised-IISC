@@ -21,4 +21,4 @@ class Ortho:
             norm = torch.sqrt(torch.dot(vect_space[i], vect_space[i]))
             if norm>0.:
                 vect_space[i] /= norm
-        return vect_space
+        return vect_space.to(torch.float32)
