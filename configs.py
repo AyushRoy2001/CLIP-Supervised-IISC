@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from torchvision import transforms
 import argparse
+import numpy as np
 
 from torchvision import transforms
 
@@ -32,7 +33,7 @@ def parse_option():
     parser.add_argument('--k_fold', type=int,
                         default=1, help='K Fold')  
     parser.add_argument('--epochs', type=int,
-                        default=25, help='Number of epochs per fold')
+                        default=100, help='Number of epochs per fold')
     parser.add_argument('--random_seed', type=int,
                         default=42, help='To reduce randomized results')
     parser.add_argument('--batch_size', type=int,
@@ -48,7 +49,7 @@ def parse_option():
     parser.add_argument('--scaling', type=float,
                         default=1.0, help='parameter for scaling mse loss')
     parser.add_argument('--random_samples', type=int,
-                        default=10, help='generating random number of samples from the subspace')
+                        default=8, help='generating random number of samples from the subspace')
     parser.add_argument('--device', type=str,
                         default='cuda', help='Device (cpu/cuda)')
     parser.add_argument('--image_directory', type=str,
@@ -80,8 +81,10 @@ class MSELoss(nn.Module):
 class ContrastiveLoss(nn.Module):
     def __init__(self):
         super(ContrastiveLoss, self).__init__()
+        self.cosine_similarity = nn.CosineSimilarity(dim=-1)
 
     def forward(self, output1, output2, output3, ranking):
+        # output1 = image_embeddings, output2 = tg, output3 = tb
         output1 = output1.squeeze(1)
         # Sorting indices for output1
         sorted_indices = torch.argsort(ranking, descending=True)
@@ -90,7 +93,7 @@ class ContrastiveLoss(nn.Module):
         output1 = torch.index_select(output1, 0, sorted_indices)
 
         # Initialize list to store losses for different positive sample sizes
-        losses = []
+        losses = torch.empty(1).to(args.device)
 
         # Iterate over positive sample sizes
         for positive_size in range(1, ranking.shape[0]):
@@ -101,18 +104,19 @@ class ContrastiveLoss(nn.Module):
             positive_samples = positive_samples.unsqueeze(1)
 
             # Calculate similarity scores
-            similarity_pos_1 = torch.cosine_similarity(positive_samples[-1].unsqueeze(1), output2)*torch.tensor(args.loss_tau, device=args.device)
-            similarity_neg_1 = torch.cosine_similarity(negative_samples, output2)*torch.tensor(args.loss_tau, device=args.device)
-            similarity_neg_2 = torch.cosine_similarity(positive_samples, output3)*torch.tensor(args.loss_tau, device=args.device)
-            similarity_pos_2 = torch.cosine_similarity(negative_samples[0].unsqueeze(1), output3)*torch.tensor(args.loss_tau, device=args.device)
-    
+            similarity_pos_1 = self.cosine_similarity(positive_samples[-1].unsqueeze(1), output2)*torch.tensor(args.loss_tau, device=args.device)
+            similarity_neg_1 = self.cosine_similarity(negative_samples, output2)*torch.tensor(args.loss_tau, device=args.device)
+            similarity_neg_2 = self.cosine_similarity(positive_samples, output3)*torch.tensor(args.loss_tau, device=args.device)
+            similarity_pos_2 = self.cosine_similarity(negative_samples[0].unsqueeze(1), output3)*torch.tensor(args.loss_tau, device=args.device)
+            
             # Calculate contrastive loss
-            loss_1 = -torch.logsumexp(similarity_pos_1, dim=-1) + torch.logsumexp(torch.cat([similarity_pos_1, similarity_neg_1]),dim=0)
-            loss_2 = -torch.logsumexp(similarity_pos_2, dim=-1) + torch.logsumexp(torch.cat([similarity_pos_2, similarity_neg_2]),dim=0)
-            losses.append(sum(loss_1))
-            losses.append(sum(loss_2))
+            loss_1 = -similarity_pos_1.squeeze(0) + torch.logsumexp(torch.cat([similarity_pos_1, similarity_neg_1]),dim=0)
+            loss_2 = -similarity_pos_2.squeeze(0) + torch.logsumexp(torch.cat([similarity_pos_2, similarity_neg_2]),dim=0)
+            # losses.append(sum(loss_1))
+            # losses.append(sum(loss_2))
+            losses = torch.cat((losses, loss_1))
+            losses = torch.cat((losses, loss_2))
 
         # Combine losses from different positive sample sizes
-        combined_loss = sum(losses)
-
+        combined_loss = torch.mean(losses[1:])
         return combined_loss
