@@ -56,7 +56,7 @@ class CustomCLIP(nn.Module):
         self.text10_embed = self.clip_model.encode_text(self.text10_token)
 
         self.ortho_vect = self._ortho.getOrtho(torch.stack([self.text1_embed[0], self.text2_embed[0], self.text3_embed[0], self.text4_embed[0], self.text5_embed[0], self.text6_embed[0], self.text7_embed[0], self.text8_embed[0], self.text9_embed[0], self.text10_embed[0]]))
-
+        
         self.text_embed_projection_good = torch.matmul(torch.cat((self.text1_embed,self.text3_embed,self.text5_embed,self.text7_embed,self.text9_embed)).to(torch.float32), self.ortho_vect.T) # projected good text embeddings
         self.text_embed_projection_bad = torch.matmul(torch.cat((self.text2_embed,self.text4_embed,self.text6_embed,self.text8_embed,self.text10_embed)).to(torch.float32), self.ortho_vect.T) # projected bad text embeddings
 
