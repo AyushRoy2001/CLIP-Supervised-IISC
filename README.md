@@ -11,3 +11,4 @@
 | scaling-0.1, eye*0.1                          | 77.50 |
 | scaling-0.1, eye*0.05                         | 79.16 |
 | scaling-0.1, eye*0.01                         | 82.29 |
+| scaling-0.1, eye*0.005                         | 82.29 |
