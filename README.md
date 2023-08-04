@@ -19,4 +19,4 @@
 | scaling-0.1, eye*0.01, alpha-0.4                                               | 78.89 |
 | Nithin's transform                                                                     |
 | scaling-0.1, eye*0.01                                                          | 73.62 |
-| scaling-0.1, batch_size-8, eye*0.01                                            | --.-- |
+| scaling-0.1, batch_size-8, eye*0.01                                            | 79.72 |
