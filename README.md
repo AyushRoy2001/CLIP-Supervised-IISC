@@ -21,3 +21,4 @@
 | scaling-0.1, eye*0.01                                                          | 73.62 |
 | scaling-0.1, batch_size-8, eye*0.01                                            | 79.72 |
 | scaling-0.1, batch_size-12, eye*0.01                                           | 77.33 |
+| scaling-0.1, batch_size-8, eye*0.01, random_samples-12                         | 77.33 |
